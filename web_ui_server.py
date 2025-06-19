@@ -74,7 +74,8 @@ MAIN_HTML = r"""
  .listen{background:var(--listen)} .talk{background:var(--talk)}
  .priv{position:absolute;top:8px;left:10px;font-size:1rem}
  .cnt{position:absolute;top:8px;right:10px;font-size:.9rem}
-.name{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;font-weight:600;padding:0 4px;user-select:none;pointer-events:none}
+.name{position:absolute;top:45%;left:50%;transform:translate(-50%,-50%);text-align:center;font-weight:600;padding:0 4px;user-select:none;pointer-events:none}
+.talkers{position:absolute;top:58%;left:50%;transform:translate(-50%,0);font-size:.8rem;text-align:center;pointer-events:none;user-select:none}
  .vol{position:absolute;bottom:10px;left:10px;width:55%}
  .off{position:absolute;bottom:6px;right:10px;padding:4px 10px;background:var(--danger);border:none;border-radius:4px;color:#fff;font-weight:600}
  #logo{position:fixed;bottom:10px;right:10px;height:60px;opacity:.6}
@@ -94,7 +95,7 @@ MAIN_HTML = r"""
  const primary = BOTS[0].port;
  let delay=false;
  // ------------- build grid -------------
- function grid(){const g=document.getElementById('grid');g.innerHTML='';LOOPS.forEach((l,i)=>{const c=document.createElement('div');c.dataset.loop=l.name;c.dataset.port='';c.className='card';c.innerHTML=`<span class='priv'>${l.can_listen?'🎧':''}${l.can_talk?'🎤':''}</span><span class='cnt'>👥0</span><div class='name'>${l.name}</div><input type='range' min='0' max='1' step='0.01' value='0.5' class='vol'><button class='off'>OFF</button>`;c.onclick=e=>{if(e.target===c)act('toggle',l.name)};c.querySelector('.off').onclick=e=>{e.stopPropagation();act('off',l.name)};c.querySelector('.vol').oninput=e=>{e.stopPropagation();const p=c.dataset.port||BOTS[i% BOTS.length].port;fetch(`http://127.0.0.1:${p}/set_volume`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({volume:e.target.value})})};g.append(c);})}
+function grid(){const g=document.getElementById('grid');g.innerHTML='';LOOPS.forEach((l,i)=>{const c=document.createElement('div');c.dataset.loop=l.name;c.dataset.port='';c.className='card';c.innerHTML=`<span class='priv'>${l.can_listen?'🎧':''}${l.can_talk?'🎤':''}</span><span class='cnt'>👥0</span><div class='name'>${l.name}</div><div class='talkers'></div><input type='range' min='0' max='1' step='0.01' value='0.5' class='vol'><button class='off'>OFF</button>`;c.onclick=e=>{if(e.target===c)act('toggle',l.name)};c.querySelector('.off').onclick=e=>{e.stopPropagation();act('off',l.name)};c.querySelector('.vol').oninput=e=>{e.stopPropagation();const p=c.dataset.port||BOTS[i% BOTS.length].port;fetch(`http://127.0.0.1:${p}/set_volume`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({volume:e.target.value})})};g.append(c);})}
  // ------------- device list -------------
  async function devices(){try{const d=await navigator.mediaDevices.enumerateDevices();const iSel=inDev,oSel=outDev;d.filter(x=>x.kind==='audioinput').forEach((d,i)=>iSel.add(new Option(d.label||`Mic ${i}`,d.deviceId)));d.filter(x=>x.kind==='audiooutput').forEach((d,i)=>oSel.add(new Option(d.label||`Spkr ${i}`,d.deviceId)));iSel.onchange=()=>chg('in',iSel.value);oSel.onchange=()=>chg('out',oSel.value);}catch(e){}}
  function chg(t,id){fetch(`http://127.0.0.1:${primary}/device_${t}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({device:id})})}
@@ -112,8 +113,8 @@ MAIN_HTML = r"""
          body:JSON.stringify({action:'delay', enabled: delay})
      });
  };
- // ------------- poll -------------
- async function refresh(){const r=await (await fetch('/api/status')).json();LOOPS.forEach(l=>{const c=document.querySelector(`[data-loop="${l.name}"]`);if(!c)return;c.dataset.port=r.assignments[l.name]||'';c.querySelector('.cnt').textContent=`👥${r.user_counts[l.name]||0}`;c.classList.remove('listen','talk');if(r.states[l.name]==1)c.classList.add('listen');if(r.states[l.name]==2)c.classList.add('talk')})}
+// ------------- poll -------------
+ async function refresh(){const r=await (await fetch('/api/status')).json();LOOPS.forEach(l=>{const c=document.querySelector(`[data-loop="${l.name}"]`);if(!c)return;c.dataset.port=r.assignments[l.name]||'';c.querySelector('.cnt').textContent=`👥${r.user_counts[l.name]||0}`;c.classList.remove('listen','talk');if(r.states[l.name]==1)c.classList.add('listen');if(r.states[l.name]==2)c.classList.add('talk');const t=c.querySelector('.talkers');if(t)t.textContent=(r.talkers[l.name]||[]).join(', ')});}
  // ------------- init -------------
  devices();wave();grid();refresh();setInterval(refresh,1000);
 </script></body></html>
@@ -194,12 +195,16 @@ def api_save_config():
 def status_api():
     counts = {l['name']: 0 for l in LOOPS}
     states = {name: st for name, (st, _) in loop_states.items()}
+    talkers = {l['name']: [] for l in LOOPS}
     for bot in BOTS:
         try:
             res = requests.get(
                 f"http://127.0.0.1:{bot['port']}/status", timeout=0.5
             ).json()
             counts.update(res.get('user_counts', {}))
+            for ln, names in res.get('talkers', {}).items():
+                talkers.setdefault(ln, [])
+                talkers[ln].extend(names)
             for ln, st in res.get('states', {}).items():
                 states[ln] = st
         except Exception:
@@ -208,7 +213,7 @@ def status_api():
         ln: (bot_pool[b]['port'] if b else None)
         for ln, (_, b) in loop_states.items()
     }
-    return jsonify(user_counts=counts, states=states, assignments=assignments)
+    return jsonify(user_counts=counts, states=states, assignments=assignments, talkers=talkers)
 
 @app.route('/api/command', methods=['POST'])
 def command_api():

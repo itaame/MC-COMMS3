@@ -106,6 +106,7 @@ class LoopBot:
         self._start_mic_stream()        # start microphone input stream
         self._start_playback_thread()   # start thread for playback
         self._users_by_channel = {}     # channel_id -> user count
+        self._talkers = {}              # channel_name -> {user: last_time}
 
         # === DELAY feature (robust version) ===
         self.audio_delay_enabled = False        # if delay is active
@@ -195,6 +196,19 @@ class LoopBot:
     def _on_sound_received(self, user, soundchunk):
         # Receive PCM from others, put to playback queue
         self._recv_q.put(soundchunk.pcm)
+        try:
+            uname = getattr(user, 'name', None) or user.get('name', '')
+            ch_id = getattr(user, 'channel_id', None)
+            if ch_id is None:
+                ch_id = user.get('channel_id', None)
+            ch_obj = self.client.channels.get(int(ch_id)) if ch_id is not None else None
+            ch_name = ''
+            if ch_obj is not None:
+                ch_name = getattr(ch_obj, 'name', None) or ch_obj.get('name', '')
+            if ch_name:
+                self._talkers.setdefault(ch_name, {})[uname] = time.time()
+        except Exception:
+            pass
 
     def _start_mic_stream(self):
         self._mic_stream = sd.InputStream(
@@ -305,9 +319,20 @@ class LoopBot:
 
     def report(self):
         user_counts = {}
+        talkers = {}
         for cid, ch in self.client.channels.items():
             chname = getattr(ch, 'name', None) or ch.get('name', '')
             user_counts[chname] = self._users_by_channel.get(int(cid), 0)
+            recent = []
+            users = self._talkers.get(chname, {})
+            now = time.time()
+            for u, t in list(users.items()):
+                if now - t < 1.0:
+                    recent.append(u)
+                else:
+                    del users[u]
+            if recent:
+                talkers[chname] = recent
         return {
             'status':     self.status,
             'loop':       self.loop,
@@ -315,6 +340,7 @@ class LoopBot:
             'device_in':  self.dev_in,
             'device_out': self.dev_out,
             'user_counts': user_counts,
+            'talkers':    talkers,
         }
 
 # --- FLASK API SERVER ---
