@@ -101,7 +101,7 @@ class LoopBot:
         self.streaming = False          # True if currently "talking"
         self.status    = "Starting…"
         self._recv_q   = queue.Queue()  # queue for received PCM audio
-        self.playback_volume = 1.0      # Output volume (0.0-1.0)
+        self.playback_volume = 1.0      # Output volume (0.0-2.0)
         self._connect_mumble()          # connect to Mumble server
         self._start_mic_stream()        # start microphone input stream
         self._start_playback_thread()   # start thread for playback
@@ -287,9 +287,9 @@ class LoopBot:
 
     def set_volume(self, vol):
         """
-        Set playback volume (0.0-1.0).
+        Set playback volume (0.0-2.0).
         """
-        self.playback_volume = max(0.0, min(1.0, float(vol)))
+        self.playback_volume = max(0.0, min(2.0, float(vol)))
 
     def _update_user_map(self):
         channel_users = {}
@@ -339,6 +339,7 @@ class LoopBot:
             'talking':    self.streaming,
             'device_in':  self.dev_in,
             'device_out': self.dev_out,
+            'volume':     self.playback_volume,
             'user_counts': user_counts,
             'talkers':    talkers,
         }

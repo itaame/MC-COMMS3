@@ -32,11 +32,13 @@ BOTS = [
 
 bot_pool   = {b['name']: {**b, 'assigned': None, 'last_used': 0} for b in BOTS}
 loop_states = {l['name']: (0, None) for l in LOOPS}
+loop_volumes = {l['name']: 1.0 for l in LOOPS}
 
 def refresh_state_from_role():
-    global LOOPS, loop_states
+    global LOOPS, loop_states, loop_volumes
     LOOPS = load_loops(role)
     loop_states = {l['name']: (0, None) for l in LOOPS}
+    loop_volumes = {l['name']: 1.0 for l in LOOPS}
 
 def find_idle_bot():
     idle = [n for n, d in bot_pool.items() if d['assigned'] is None]
@@ -95,7 +97,7 @@ MAIN_HTML = r"""
  const primary = BOTS[0].port;
  let delay=false;
  // ------------- build grid -------------
-function grid(){const g=document.getElementById('grid');g.innerHTML='';LOOPS.forEach((l,i)=>{const c=document.createElement('div');c.dataset.loop=l.name;c.dataset.port='';c.className='card';c.innerHTML=`<span class='priv'>${l.can_listen?'🎧':''}${l.can_talk?'🎤':''}</span><span class='cnt'>👥0</span><div class='name'>${l.name}</div><div class='talkers'></div><input type='range' min='0' max='1' step='0.01' value='0.5' class='vol'><button class='off'>OFF</button>`;c.onclick=e=>{if(e.target===c)act('toggle',l.name)};c.querySelector('.off').onclick=e=>{e.stopPropagation();act('off',l.name)};c.querySelector('.vol').oninput=e=>{e.stopPropagation();const p=c.dataset.port||BOTS[i% BOTS.length].port;fetch(`http://127.0.0.1:${p}/set_volume`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({volume:e.target.value})})};g.append(c);})}
+function grid(){const g=document.getElementById('grid');g.innerHTML='';LOOPS.forEach((l,i)=>{const c=document.createElement('div');c.dataset.loop=l.name;c.dataset.port='';c.className='card';c.innerHTML=`<span class='priv'>${l.can_listen?'🎧':''}${l.can_talk?'🎤':''}</span><span class='cnt'>👥0</span><div class='name'>${l.name}</div><div class='talkers'></div><input type='range' min='0' max='2' step='0.01' value='1' class='vol'><button class='off'>OFF</button>`;c.onclick=e=>{if(e.target===c)act('toggle',l.name)};c.querySelector('.off').onclick=e=>{e.stopPropagation();act('off',l.name)};c.querySelector('.vol').oninput=e=>{e.stopPropagation();fetch('/api/set_volume',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({loop:l.name,volume:e.target.value})})};g.append(c);})}
  // ------------- device list -------------
  async function devices(){try{const d=await navigator.mediaDevices.enumerateDevices();const iSel=inDev,oSel=outDev;d.filter(x=>x.kind==='audioinput').forEach((d,i)=>iSel.add(new Option(d.label||`Mic ${i}`,d.deviceId)));d.filter(x=>x.kind==='audiooutput').forEach((d,i)=>oSel.add(new Option(d.label||`Spkr ${i}`,d.deviceId)));iSel.onchange=()=>chg('in',iSel.value);oSel.onchange=()=>chg('out',oSel.value);}catch(e){}}
  function chg(t,id){fetch(`http://127.0.0.1:${primary}/device_${t}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({device:id})})}
@@ -114,7 +116,7 @@ function grid(){const g=document.getElementById('grid');g.innerHTML='';LOOPS.for
      });
  };
 // ------------- poll -------------
- async function refresh(){const r=await (await fetch('/api/status')).json();LOOPS.forEach(l=>{const c=document.querySelector(`[data-loop="${l.name}"]`);if(!c)return;c.dataset.port=r.assignments[l.name]||'';c.querySelector('.cnt').textContent=`👥${r.user_counts[l.name]||0}`;c.classList.remove('listen','talk');if(r.states[l.name]==1)c.classList.add('listen');if(r.states[l.name]==2)c.classList.add('talk');const t=c.querySelector('.talkers');if(t)t.textContent=(r.talkers[l.name]||[]).join(', ')});}
+async function refresh(){const r=await (await fetch('/api/status')).json();LOOPS.forEach(l=>{const c=document.querySelector(`[data-loop="${l.name}"]`);if(!c)return;c.dataset.port=r.assignments[l.name]||'';c.querySelector('.cnt').textContent=`👥${r.user_counts[l.name]||0}`;c.classList.remove('listen','talk');if(r.states[l.name]==1)c.classList.add('listen');if(r.states[l.name]==2)c.classList.add('talk');const t=c.querySelector('.talkers');if(t)t.textContent=(r.talkers[l.name]||[]).join(', ');const v=c.querySelector('.vol');if(v&&r.volumes)v.value=r.volumes[l.name]??1;});}
  // ------------- init -------------
  devices();wave();grid();refresh();setInterval(refresh,1000);
 </script></body></html>
@@ -213,7 +215,26 @@ def status_api():
         ln: (bot_pool[b]['port'] if b else None)
         for ln, (_, b) in loop_states.items()
     }
-    return jsonify(user_counts=counts, states=states, assignments=assignments, talkers=talkers)
+    return jsonify(user_counts=counts, states=states, assignments=assignments, talkers=talkers, volumes=loop_volumes)
+
+@app.route('/api/set_volume', methods=['POST'])
+def api_set_volume():
+    data = request.get_json(force=True)
+    loop = data.get('loop')
+    vol = max(0.0, min(2.0, float(data.get('volume', 1.0))))
+    loop_volumes[loop] = vol
+    _, bot_name = loop_states.get(loop, (0, None))
+    if bot_name:
+        port = bot_pool[bot_name]['port']
+        try:
+            requests.post(
+                f"http://127.0.0.1:{port}/set_volume",
+                json={'volume': vol},
+                timeout=0.5,
+            )
+        except Exception:
+            pass
+    return '', 204
 
 @app.route('/api/command', methods=['POST'])
 def command_api():
@@ -263,6 +284,7 @@ def command_api():
 
     if new_state == 1:
         requests.post(f"http://127.0.0.1:{port}/join", json={'loop': loop})
+        requests.post(f"http://127.0.0.1:{port}/set_volume", json={'volume': loop_volumes.get(loop, 1.0)})
         if delay_enabled and old_state == 2:
             requests.post(f"http://127.0.0.1:{port}/mute_after_delay", json={})
         else:
@@ -277,6 +299,7 @@ def command_api():
                     requests.post(f"http://127.0.0.1:{op}/mute")
                 loop_states[other] = (1, ob)
         requests.post(f"http://127.0.0.1:{port}/join", json={'loop': loop})
+        requests.post(f"http://127.0.0.1:{port}/set_volume", json={'volume': loop_volumes.get(loop, 1.0)})
         requests.post(f"http://127.0.0.1:{port}/talk")
 
     bot_pool[assigned]['assigned'] = loop
