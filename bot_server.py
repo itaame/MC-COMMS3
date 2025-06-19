@@ -339,7 +339,6 @@ class LoopBot:
             'talking':    self.streaming,
             'device_in':  self.dev_in,
             'device_out': self.dev_out,
-            'volume':     self.playback_volume,
             'user_counts': user_counts,
             'talkers':    talkers,
         }
