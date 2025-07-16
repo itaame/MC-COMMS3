@@ -116,7 +116,7 @@ function grid(){const g=document.getElementById('grid');g.innerHTML='';LOOPS.for
      });
  };
 // ------------- poll -------------
-async function refresh(){const r=await (await fetch('/api/status')).json();LOOPS.forEach(l=>{const c=document.querySelector(`[data-loop="${l.name}"]`);if(!c)return;c.dataset.port=r.assignments[l.name]||'';c.querySelector('.cnt').textContent=`👥${r.user_counts[l.name]||0}`;c.classList.remove('listen','talk');if(r.states[l.name]==1)c.classList.add('listen');if(r.states[l.name]==2)c.classList.add('talk');const t=c.querySelector('.talkers');if(t)t.textContent=(r.talkers[l.name]||[]).join(', ');const v=c.querySelector('.vol');if(v&&r.volumes)v.value=r.volumes[l.name]??1;});}
+async function refresh(){const r=await (await fetch('/api/status')).json();delay=r.delay;dBtn.style.background=delay?'#43d843':'#c22c2c';LOOPS.forEach(l=>{const c=document.querySelector(`[data-loop="${l.name}"]`);if(!c)return;c.dataset.port=r.assignments[l.name]||'';c.querySelector('.cnt').textContent=`👥${r.user_counts[l.name]||0}`;c.classList.remove('listen','talk');if(r.states[l.name]==1)c.classList.add('listen');if(r.states[l.name]==2)c.classList.add('talk');const t=c.querySelector('.talkers');if(t)t.textContent=(r.talkers[l.name]||[]).join(', ');const v=c.querySelector('.vol');if(v&&r.volumes)v.value=r.volumes[l.name]??1;});}
  // ------------- init -------------
  devices();wave();grid();refresh();setInterval(refresh,1000);
 </script></body></html>
@@ -215,7 +215,8 @@ def status_api():
         ln: (bot_pool[b]['port'] if b else None)
         for ln, (_, b) in loop_states.items()
     }
-    return jsonify(user_counts=counts, states=states, assignments=assignments, talkers=talkers, volumes=loop_volumes)
+    return jsonify(user_counts=counts, states=states, assignments=assignments,
+                   talkers=talkers, volumes=loop_volumes, delay=delay_enabled)
 
 @app.route('/api/set_volume', methods=['POST'])
 def api_set_volume():
