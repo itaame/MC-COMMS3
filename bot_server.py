@@ -274,6 +274,12 @@ class LoopBot:
     def talk(self):
         self.streaming = True
         self.status    = f"Talk → {self.loop or 'Root'}"
+        if self.audio_delay_enabled:
+            while not self.audio_delay_queue.empty():
+                try:
+                    self.audio_delay_queue.get_nowait()
+                except Exception:
+                    break
 
     def mute(self):
         self.streaming = False
