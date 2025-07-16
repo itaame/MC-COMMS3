@@ -8,7 +8,7 @@ import webbrowser
 CONFIG_FILE = "run_config.json"
 
 ROLES = [
-    "FLIGHT", "CAPCOM", "FAO", "BME", "CPOO", "SCIENCE", "EVA",
+    "FLIGHT", "CAPCOM", "FAO", "BME", "CPOO", "SCIENCE", "EVA", "MPC", "AA"
 ]
 
 

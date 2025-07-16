@@ -6,7 +6,7 @@ from config_dialog import read_config, write_config
 config = read_config() or {}
 role   = config.get("role", "FLIGHT")
 
-ROLES = ['FLIGHT','CAPCOM','FAO','BME','CPOO','SCIENCE','EVA']
+ROLES = ['FLIGHT','CAPCOM','FAO','BME','CPOO','SCIENCE','EVA','MPC','AA']
 
 # Build HTML option tags for roles once
 options = "".join(f"<option value='{r}'>{r}</option>" for r in ROLES)
