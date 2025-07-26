@@ -135,6 +135,7 @@ CONFIG_HTML = f"""
   <h2>Mission Control Setup</h2>
   <label>Server<input id='srv'></label>
   <label>Port<input id='prt' type='number'></label>
+  <label>Password<input id='pwd' type='password'></label>
   <label>Bot Base<input id='bot'></label>
   <label>Role <select id='role'>{options}</select></label>
   <button id='save'>Save</button>
@@ -143,6 +144,7 @@ CONFIG_HTML = f"""
    const cfg = await (await fetch('/api/get_config')).json();
    document.getElementById('srv').value  = cfg.server   || '';
    document.getElementById('prt').value  = cfg.port     || '';
+   document.getElementById('pwd').value  = cfg.password || '';
    document.getElementById('bot').value  = cfg.bot_base || '';
    document.getElementById('role').value = cfg.role     || 'FLIGHT';
  }}
@@ -150,6 +152,7 @@ CONFIG_HTML = f"""
    const cfg = {{
      server:  document.getElementById('srv').value,
      port:    +document.getElementById('prt').value,
+    password:document.getElementById('pwd').value,
      bot_base:document.getElementById('bot').value,
      role:    document.getElementById('role').value
    }};

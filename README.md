@@ -36,7 +36,7 @@ Run the main script:
 python start_all.py
 ```
 On the first launch, a configuration web page will open automatically. Enter the
-Mumble server address, port, bot base name and choose your role. When you submit
+Mumble server address, port, optional server password, bot base name and choose your role. When you submit
 that page a `run_config.json` file is created and the application will continue
 running.
 

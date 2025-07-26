@@ -15,12 +15,17 @@ config = get_config_from_dialog()
 SERVER = config['server']
 PORT = config['port']
 BOT_BASE = config['bot_base']
+PASSWORD = config.get('password', '')
 
 bots = [
     [sys.executable, os.path.join(DIR, "bot_server.py"), "--server", SERVER, "--port", str(PORT), "--bot-name", f"{BOT_BASE}", "--api-port", "6001"],
     [sys.executable, os.path.join(DIR, "bot_server.py"), "--server", SERVER, "--port", str(PORT), "--bot-name", f"{BOT_BASE}1", "--api-port", "6002"],
     [sys.executable, os.path.join(DIR, "bot_server.py"), "--server", SERVER, "--port", str(PORT), "--bot-name", f"{BOT_BASE}2", "--api-port", "6003"]
 ]
+
+if PASSWORD:
+    for cmd in bots:
+        cmd.extend(["--password", PASSWORD])
 
 procs = []
 for cmd in bots:

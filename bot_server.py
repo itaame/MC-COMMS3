@@ -74,11 +74,13 @@ parser.add_argument("--bot-name", required=True)
 parser.add_argument("--api-port", required=True, type=int)
 parser.add_argument("--server", required=True)
 parser.add_argument("--port", required=True, type=int)
+parser.add_argument("--password", default="")
 args = parser.parse_args()
 
 SERVER = args.server
 PORT   = args.port
 USER   = args.bot_name
+PASSWORD = args.password
 
 certfile, keyfile = ensure_bot_cert(USER)
 
@@ -172,6 +174,7 @@ class LoopBot:
     def _connect_mumble(self):
         self.client = Mumble(
             SERVER, USER, port=PORT, reconnect=True,
+            password=(PASSWORD or None),
             certfile=certfile, keyfile=keyfile,
         )
         self.client.callbacks.set_callback(PYMUMBLE_CLBK_USERUPDATED,  lambda u,e: self._update_user_map())
