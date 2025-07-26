@@ -172,11 +172,15 @@ class LoopBot:
                 print(f"[AUDIO OUT ERROR] {e}")
 
     def _connect_mumble(self):
-        self.client = Mumble(
-            SERVER, USER, port=PORT, reconnect=True,
-            password=(PASSWORD or None),
-            certfile=certfile, keyfile=keyfile,
-        )
+        kwargs = {
+            "port": PORT,
+            "reconnect": True,
+            "certfile": certfile,
+            "keyfile": keyfile,
+        }
+        if PASSWORD:
+            kwargs["password"] = PASSWORD
+        self.client = Mumble(SERVER, USER, **kwargs)
         self.client.callbacks.set_callback(PYMUMBLE_CLBK_USERUPDATED,  lambda u,e: self._update_user_map())
         self.client.callbacks.set_callback(PYMUMBLE_CLBK_USERREMOVED,  lambda u,e: self._update_user_map())
         self.client.set_receive_sound(True)
