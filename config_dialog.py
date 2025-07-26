@@ -19,11 +19,12 @@ def read_config():
     return None
 
 
-def write_config(server, port, bot_base, role):
+def write_config(server, port, password, bot_base, role):
     with open(CONFIG_FILE, "w") as f:
         json.dump({
             "server": server,
             "port": port,
+            "password": password,
             "bot_base": bot_base,
             "role": role,
         }, f)
